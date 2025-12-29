@@ -17,6 +17,14 @@ interface UserStats {
   lastStudyDate: string; // YYYY-MM-DD
 }
 
+// Utility to generate ID (Fallback for non-secure contexts)
+const generateId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+};
+
 const App: React.FC = () => {
   // Tabs: 'learn' | 'flashcard' | 'repo'
   const [activeTab, setActiveTab] = useState<'learn' | 'flashcard' | 'repo'>('learn');
@@ -116,11 +124,11 @@ const App: React.FC = () => {
             if (existingMeaning === newItemMeaning) {
                 ignoredCount++;
             } else {
-                confirmItems.push({ ...newItem, id: crypto.randomUUID() });
+                confirmItems.push({ ...newItem, id: generateId() });
                 confirmNames.add(newItem.word);
             }
         } else {
-            safeItems.push({ ...newItem, id: crypto.randomUUID() });
+            safeItems.push({ ...newItem, id: generateId() });
         }
     });
 
@@ -196,10 +204,10 @@ const App: React.FC = () => {
   };
 
   // Layout classes
-  // Note: We use 'fixed' positioning for Flashcard to prevent body scroll, but allow footer to overlap or sit on bottom.
+  // Fix: Use 100dvh for mobile browsers
   const mainContainerClasses = activeTab === 'flashcard' 
-    ? "fixed inset-0 overflow-hidden flex flex-col bg-slate-50" 
-    : "min-h-screen bg-slate-50 text-slate-900 pb-32 md:pb-0 font-sans";
+    ? "fixed inset-0 h-[100dvh] overflow-hidden flex flex-col bg-slate-50" 
+    : "min-h-[100dvh] bg-slate-50 text-slate-900 pb-32 md:pb-0 font-sans";
 
   return (
     <div className={mainContainerClasses}>
@@ -363,7 +371,7 @@ const App: React.FC = () => {
       </main>
 
       {/* Floating Mobile Bottom Navigation - VISIBLE ON ALL TABS */}
-      <div className="md:hidden fixed bottom-6 left-4 right-4 bg-white/95 backdrop-blur-xl border border-blue-100 rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] z-50 px-6 py-3 flex justify-between items-center h-[72px] animate-in slide-in-from-bottom-20 duration-500">
+      <div className="md:hidden fixed bottom-6 left-4 right-4 bg-white/95 backdrop-blur-xl border border-blue-100 rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] z-50 px-6 py-3 flex justify-between items-center h-[72px] animate-in slide-in-from-bottom-20 duration-500 pb-[env(safe-area-inset-bottom)]">
         
         {/* Repo Tab */}
         <button 
