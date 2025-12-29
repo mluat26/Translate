@@ -1,0 +1,5 @@
+{
+  "name": "VocabNote AI",
+  "description": "Ứng dụng ghi chú từ vựng thông minh hỗ trợ bởi Gemini, tự động tra cứu ý nghĩa và xuất ra file Word.",
+  "requestFramePermissions": []
+}
