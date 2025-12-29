@@ -9,27 +9,27 @@ export const generateDoc = async (vocabList: VocabItem[], title: string = "Danh 
       children: [
         new TableCell({
           width: { size: 20, type: WidthType.PERCENTAGE },
-          shading: { fill: "4F46E5" }, // Indigo header
+          shading: { fill: "2563EB" }, // Blue-600 header
           children: [new Paragraph({ children: [new TextRun({ text: "Từ vựng (IPA)", bold: true, color: "FFFFFF" })] })],
         }),
         new TableCell({
           width: { size: 10, type: WidthType.PERCENTAGE },
-          shading: { fill: "4F46E5" },
+          shading: { fill: "2563EB" },
           children: [new Paragraph({ children: [new TextRun({ text: "Loại", bold: true, color: "FFFFFF" })] })],
         }),
         new TableCell({
           width: { size: 10, type: WidthType.PERCENTAGE },
-          shading: { fill: "4F46E5" },
+          shading: { fill: "2563EB" },
           children: [new Paragraph({ children: [new TextRun({ text: "Level", bold: true, color: "FFFFFF" })] })],
         }),
         new TableCell({
           width: { size: 25, type: WidthType.PERCENTAGE },
-          shading: { fill: "4F46E5" },
+          shading: { fill: "2563EB" },
           children: [new Paragraph({ children: [new TextRun({ text: "Nghĩa (VN)", bold: true, color: "FFFFFF" })] })],
         }),
         new TableCell({
           width: { size: 35, type: WidthType.PERCENTAGE },
-          shading: { fill: "4F46E5" },
+          shading: { fill: "2563EB" },
           children: [new Paragraph({ children: [new TextRun({ text: "Ví dụ", bold: true, color: "FFFFFF" })] })],
         }),
       ],

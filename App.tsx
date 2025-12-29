@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, GraduationCap, Zap, Activity, BrainCircuit, Flame, Bell, CheckCircle2, Settings } from 'lucide-react';
+import { BookOpen, Zap, Flame, Settings, Plus, GalleryHorizontalEnd, LayoutGrid } from 'lucide-react';
 import VocabForm from './components/VocabForm';
 import VocabList from './components/VocabList';
 import VocabRepository from './components/VocabRepository';
 import FlashcardMode from './components/FlashcardMode';
 import ConfirmationModal from './components/ConfirmationModal';
 import SettingsModal from './components/SettingsModal';
+import StatsBar from './components/StatsBar';
+import StorageManagerModal from './components/StorageManagerModal';
 import { VocabItem } from './types';
 import { generateDoc } from './services/docService';
+import { getAllVocab, addVocabItem, bulkAddVocabItems, deleteVocabItem, updateVocabItem, bulkDeleteVocabItems } from './services/db';
 
 interface UserStats {
   streak: number;
@@ -18,11 +21,9 @@ const App: React.FC = () => {
   // Tabs: 'learn' | 'flashcard' | 'repo'
   const [activeTab, setActiveTab] = useState<'learn' | 'flashcard' | 'repo'>('learn');
 
-  // Load initial vocab list
-  const [vocabList, setVocabList] = useState<VocabItem[]>(() => {
-    const saved = localStorage.getItem('vocabList');
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Vocab list state
+  const [vocabList, setVocabList] = useState<VocabItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Load Stats
   const [stats, setStats] = useState<UserStats>(() => {
@@ -33,7 +34,6 @@ const App: React.FC = () => {
   // API Key State
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('geminiApiKey') || '');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
   const [hasStudiedToday, setHasStudiedToday] = useState(false);
   
   // Duplicate Handling State
@@ -42,14 +42,31 @@ const App: React.FC = () => {
   const [duplicateWordsNames, setDuplicateWordsNames] = useState<string[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
 
+  // Storage Modal
+  const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
+
+  // Trigger for StatsBar
+  const [dataVersion, setDataVersion] = useState(0);
+
+  // Initial DB Load
   useEffect(() => {
-    localStorage.setItem('vocabList', JSON.stringify(vocabList));
-  }, [vocabList]);
+    const loadData = async () => {
+      try {
+        const items = await getAllVocab();
+        setVocabList(items.reverse()); 
+        setDataVersion(v => v + 1); // Init stats
+      } catch (error) {
+        console.error("Failed to load from DB", error);
+        showNotification("Lỗi tải dữ liệu từ bộ nhớ.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('userStats', JSON.stringify(stats));
-    
-    // Check if studied today
     const today = new Date().toISOString().split('T')[0];
     setHasStudiedToday(stats.lastStudyDate === today);
   }, [stats]);
@@ -60,28 +77,21 @@ const App: React.FC = () => {
     if(key) showNotification("Đã lưu API Key thành công!");
   };
 
-  // Update Stats Logic
   const updateStreak = () => {
     const today = new Date().toISOString().split('T')[0];
-    
     setStats(prev => {
-        if (prev.lastStudyDate === today) return prev; // Already studied today
-
+        if (prev.lastStudyDate === today) return prev; 
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().split('T')[0];
 
         let newStreak = prev.streak;
         if (prev.lastStudyDate === yesterdayStr) {
-            newStreak += 1; // Consecutive day
+            newStreak += 1;
         } else {
-            newStreak = 1; // Broken streak or first day
+            newStreak = 1;
         }
-
-        return {
-            streak: newStreak,
-            lastStudyDate: today
-        };
+        return { streak: newStreak, lastStudyDate: today };
     });
   };
 
@@ -90,70 +100,86 @@ const App: React.FC = () => {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  // Logic Adding Items
-  const handleAddVocab = (newItems: Omit<VocabItem, 'id'>[]) => {
+  const handleAddVocab = async (newItems: Omit<VocabItem, 'id'>[]) => {
     const safeItems: VocabItem[] = [];
     const confirmItems: VocabItem[] = [];
     const confirmNames: Set<string> = new Set();
     let ignoredCount = 0;
 
     newItems.forEach(newItem => {
-        // Normalize for comparison
         const newItemWord = newItem.word.trim().toLowerCase();
         const newItemMeaning = newItem.meaning.trim().toLowerCase();
-
-        // Check if exists
         const existingWord = vocabList.find(v => v.word.toLowerCase() === newItemWord);
 
         if (existingWord) {
-            // Check meaning similarity (simple check)
             const existingMeaning = existingWord.meaning.toLowerCase();
-            
-            // If identical word AND identical meaning -> Ignore (Exact Duplicate)
             if (existingMeaning === newItemMeaning) {
                 ignoredCount++;
             } else {
-                // Same word but different meaning -> Ask confirmation
                 confirmItems.push({ ...newItem, id: crypto.randomUUID() });
                 confirmNames.add(newItem.word);
             }
         } else {
-            // New word -> Add straight away
             safeItems.push({ ...newItem, id: crypto.randomUUID() });
         }
     });
 
-    // 1. Process safe items
     if (safeItems.length > 0) {
+        // Optimistic update
         setVocabList(prev => [...safeItems, ...prev]);
         updateStreak();
+        // DB update
+        await bulkAddVocabItems(safeItems);
+        setDataVersion(v => v + 1); // Refresh stats
     }
 
-    // 2. Handle ignored
     let msg = "";
     if (safeItems.length > 0) msg += `Đã thêm ${safeItems.length} từ mới. `;
     if (ignoredCount > 0) msg += `Bỏ qua ${ignoredCount} từ trùng lặp hoàn toàn.`;
-    
     if (msg) showNotification(msg);
 
-    // 3. Handle confirmations
     if (confirmItems.length > 0) {
         setPendingItems(confirmItems);
         setDuplicateWordsNames(Array.from(confirmNames));
         setIsModalOpen(true);
     }
+    
+    setDataVersion(v => v + 1);
   };
 
-  const handleConfirmDuplicates = () => {
+  const handleConfirmDuplicates = async () => {
       setVocabList(prev => [...pendingItems, ...prev]);
       updateStreak();
+      await bulkAddVocabItems(pendingItems);
+      setDataVersion(v => v + 1);
+
       setIsModalOpen(false);
       setPendingItems([]);
       showNotification(`Đã thêm ${pendingItems.length} từ có nghĩa mới.`);
   };
 
-  const handleDeleteVocab = (id: string) => {
+  const handleDeleteVocab = async (id: string) => {
     setVocabList(prev => prev.filter(item => item.id !== id));
+    await deleteVocabItem(id);
+    setDataVersion(v => v + 1);
+  };
+
+  const handleBulkDelete = async (ids: string[]) => {
+      setVocabList(prev => prev.filter(item => !ids.includes(item.id)));
+      await bulkDeleteVocabItems(ids);
+      setDataVersion(v => v + 1);
+      showNotification(`Đã xóa ${ids.length} từ vựng.`);
+      setIsStorageModalOpen(false);
+  };
+
+  const handleUpdateConfidence = async (id: string, level: number) => {
+      const updatedItem = vocabList.find(i => i.id === id);
+      if (updatedItem) {
+          const newItem = { ...updatedItem, confidence: level, lastReviewed: new Date().toISOString() };
+          setVocabList(prev => prev.map(item => item.id === id ? newItem : item));
+          await updateVocabItem(newItem);
+          setDataVersion(v => v + 1);
+      }
   };
 
   const handleExport = async () => {
@@ -170,19 +196,19 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900 font-sans pb-32 md:pb-0">
       
       {/* Notifications Toast */}
       {notification && (
-          <div className="fixed top-20 right-4 z-[60] animate-in slide-in-from-right fade-in duration-300">
-              <div className="bg-slate-800 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+          <div className="fixed top-24 right-4 z-[60] animate-in slide-in-from-right fade-in duration-300">
+              <div className="bg-slate-800 text-white px-5 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-sm font-medium">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
                   {notification}
               </div>
           </div>
       )}
 
-      {/* Confirmation Modal */}
+      {/* Modals */}
       <ConfirmationModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -192,7 +218,6 @@ const App: React.FC = () => {
         items={duplicateWordsNames}
       />
 
-      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -200,40 +225,41 @@ const App: React.FC = () => {
         onSave={handleSaveApiKey}
       />
 
-      {/* Decorative Background Elements */}
+      <StorageManagerModal 
+        isOpen={isStorageModalOpen}
+        onClose={() => setIsStorageModalOpen(false)}
+        items={vocabList}
+        onDeleteItems={handleBulkDelete}
+      />
+
+      {/* Background - Blue Ocean Theme */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-200/20 blur-[120px]"></div>
-          <div className="absolute top-[40%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-200/20 blur-[100px]"></div>
-          <div className="absolute bottom-[-10%] left-[20%] w-[30%] h-[30%] rounded-full bg-emerald-100/30 blur-[80px]"></div>
+          <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-blue-200/20 blur-[120px]"></div>
+          <div className="absolute top-[40%] right-[-10%] w-[50%] h-[50%] rounded-full bg-cyan-200/20 blur-[100px]"></div>
       </div>
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-indigo-600 to-purple-600 p-2 rounded-xl shadow-lg shadow-indigo-500/20 ring-1 ring-white/50">
-              <BookOpen className="w-5 h-5 text-white" />
-            </div>
-            <div className="block">
-                <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-none">VocabNote AI</h1>
-                <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-0.5">
-                  {apiKey ? 'Auto Mode' : 'Manual Mode'}
-                </p>
-            </div>
+      {/* Minimal Header */}
+      <header className="sticky top-0 z-40 pt-4 px-4 sm:px-6 lg:px-8 mb-4 pointer-events-none">
+        <div className="max-w-7xl mx-auto flex items-start justify-between pointer-events-auto">
+          
+          {/* Stats Bar */}
+          <div className="flex flex-col gap-2">
+            <StatsBar 
+               triggerRefresh={dataVersion} 
+               onOpenStorage={() => setIsStorageModalOpen(true)}
+            />
           </div>
           
-          <div className="flex items-center gap-3">
-             {/* Streak Badge */}
-             <div className={`hidden xs:flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${hasStudiedToday ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-slate-100 text-slate-500 border-slate-200 grayscale'}`} title="Chuỗi ngày học liên tiếp">
-                 <Flame className={`w-3.5 h-3.5 ${hasStudiedToday ? 'fill-orange-500 text-orange-600' : 'text-slate-400'}`} />
+          {/* Right Controls */}
+          <div className="flex items-center gap-3 bg-white/80 backdrop-blur-md p-1.5 rounded-full border border-white/50 shadow-sm">
+             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${hasStudiedToday ? 'bg-orange-50 text-orange-600' : 'bg-slate-50 text-slate-400 grayscale'}`} title="Chuỗi ngày học liên tiếp">
+                 <Flame className={`w-4 h-4 ${hasStudiedToday ? 'fill-orange-500 text-orange-600' : 'text-slate-300'}`} />
                  <span>{stats.streak}</span>
              </div>
-
-             {/* Settings Button */}
              <button
                onClick={() => setIsSettingsOpen(true)}
-               className={`p-2 rounded-full border transition-all ${apiKey ? 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' : 'bg-indigo-50 text-indigo-600 border-indigo-200 animate-pulse'}`}
-               title="Cài đặt API Key"
+               className={`p-2 rounded-full transition-all ${apiKey ? 'hover:bg-slate-100 text-slate-600' : 'bg-blue-50 text-blue-600 animate-pulse'}`}
+               title="Cài đặt"
              >
                 <Settings className="w-5 h-5" />
              </button>
@@ -241,65 +267,32 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Reminder Banner */}
-      {!hasStudiedToday && (
-          <div className="bg-indigo-600 text-white py-2 px-4 text-center text-sm font-medium relative overflow-hidden animate-in fade-in slide-in-from-top-2">
-              <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-              <div className="relative flex items-center justify-center gap-2">
-                  <Bell className="w-4 h-4 animate-bounce" />
-                  Hôm nay bạn chưa thêm từ mới nào. Hãy duy trì thói quen nhé!
-              </div>
-          </div>
-      )}
-
       {/* Main Content */}
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         
-        {/* Fixed Pill Segmentation Control */}
-        <div className="flex justify-center mb-10 sticky top-20 z-40 px-2">
-          <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-full grid grid-cols-3 relative border border-slate-200/60 shadow-lg shadow-slate-200/40 w-full max-w-md">
-            
-            {/* Moving Indicator */}
+        {/* Desktop Navigation (Hidden on Mobile) */}
+        <div className="hidden md:flex justify-center mb-10 px-2">
+          <div className="bg-white p-2 rounded-full grid grid-cols-3 relative border border-slate-100 shadow-xl shadow-slate-200/50 w-full max-w-lg">
             <div 
-              className={`absolute top-1.5 bottom-1.5 rounded-full bg-indigo-600 shadow-md transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]`}
+              className={`absolute top-2 bottom-2 rounded-full bg-blue-600 shadow-lg shadow-blue-500/30 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]`}
               style={{
-                width: 'calc((100% - 12px) / 3)', // Subtract total horizontal padding (1.5 * 4 = 12px approx spacing considerations, simplified) 
-                // Better calc: Container padding is p-1.5 (6px). So width available is 100% - 12px.
-                // Each item is (100% - 12px) / 3.
-                left: '6px',
+                width: 'calc((100% - 16px) / 3)', 
+                left: '8px',
                 transform: `translateX(${activeTab === 'learn' ? '0%' : activeTab === 'flashcard' ? '100%' : '200%'})`
               }}
             ></div>
 
-            <button
-              onClick={() => setActiveTab('learn')}
-              className={`relative z-10 py-2.5 text-sm font-bold rounded-full transition-colors duration-300 flex items-center justify-center gap-2 ${
-                activeTab === 'learn' ? 'text-white' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
+            <button onClick={() => setActiveTab('learn')} className={`relative z-10 py-3 text-sm font-bold rounded-full transition-colors duration-300 flex items-center justify-center gap-2 ${activeTab === 'learn' ? 'text-white' : 'text-slate-500 hover:text-slate-800'}`}>
               <Zap className="w-4 h-4" />
-              <span className="hidden xs:inline">Thêm từ</span>
-              <span className="xs:hidden">Thêm</span>
+              <span>Thêm từ</span>
             </button>
-            <button
-              onClick={() => setActiveTab('flashcard')}
-              className={`relative z-10 py-2.5 text-sm font-bold rounded-full transition-colors duration-300 flex items-center justify-center gap-2 ${
-                activeTab === 'flashcard' ? 'text-white' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <BrainCircuit className="w-4 h-4" />
-              <span className="hidden xs:inline">Flashcard</span>
-              <span className="xs:hidden">Học</span>
+            <button onClick={() => setActiveTab('flashcard')} className={`relative z-10 py-3 text-sm font-bold rounded-full transition-colors duration-300 flex items-center justify-center gap-2 ${activeTab === 'flashcard' ? 'text-white' : 'text-slate-500 hover:text-slate-800'}`}>
+              <GalleryHorizontalEnd className="w-4 h-4" />
+              <span>Flashcard</span>
             </button>
-            <button
-              onClick={() => setActiveTab('repo')}
-              className={`relative z-10 py-2.5 text-sm font-bold rounded-full transition-colors duration-300 flex items-center justify-center gap-2 ${
-                activeTab === 'repo' ? 'text-white' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <GraduationCap className="w-4 h-4" />
-              <span className="hidden xs:inline">Kho từ</span>
-              <span className="xs:hidden">Kho</span>
+            <button onClick={() => setActiveTab('repo')} className={`relative z-10 py-3 text-sm font-bold rounded-full transition-colors duration-300 flex items-center justify-center gap-2 ${activeTab === 'repo' ? 'text-white' : 'text-slate-500 hover:text-slate-800'}`}>
+              <LayoutGrid className="w-4 h-4" />
+              <span>Kho từ</span>
             </button>
           </div>
         </div>
@@ -307,17 +300,14 @@ const App: React.FC = () => {
         {/* Tab Content */}
         <div className="min-h-[500px]">
         {activeTab === 'learn' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
-            <div className="text-center space-y-2">
-              <h2 className="text-3xl font-bold text-slate-800 tracking-tight">
-                 {apiKey ? 'Chế độ tự động' : 'Quy trình thủ công'}
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+            <div className="text-center space-y-1 mb-6">
+              <div className="inline-flex items-center justify-center p-3 bg-blue-100 rounded-2xl mb-2 text-blue-600">
+                <BookOpen className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
+                 {apiKey ? 'Thêm từ tự động' : 'Thêm từ thủ công'}
               </h2>
-              <p className="text-slate-500 text-sm max-w-md mx-auto">
-                 {apiKey 
-                    ? 'Nhập từ vựng và AI sẽ tự động điền thông tin chi tiết cho bạn.' 
-                    : 'Nhập từ vựng → Copy Prompt → Dán vào AI → Nhập kết quả JSON để lưu trữ.'
-                 }
-              </p>
             </div>
             
             <div className="max-w-4xl mx-auto">
@@ -325,10 +315,10 @@ const App: React.FC = () => {
             </div>
             
             {vocabList.length > 0 && (
-              <div className="max-w-7xl mx-auto">
+              <div className="max-w-7xl mx-auto pt-8">
                  <div className="flex items-center gap-4 mb-6">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
-                       Vừa thêm gần đây
+                    <span className="text-xs font-bold text-blue-500 uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-full">
+                       Gần đây
                     </span>
                     <div className="h-px bg-slate-200 flex-1"></div>
                  </div>
@@ -339,20 +329,27 @@ const App: React.FC = () => {
         )}
 
         {activeTab === 'flashcard' && (
-          <div className="animate-in zoom-in-95 duration-500 max-w-5xl mx-auto">
+          <div className="animate-in zoom-in-95 duration-500 max-w-5xl mx-auto pt-4">
              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-slate-800 tracking-tight mb-2">Luyện tập từ vựng</h2>
-                <p className="text-slate-500 text-sm">Chạm vào thẻ để xem nghĩa và ví dụ.</p>
+                <div className="inline-flex items-center justify-center p-3 bg-cyan-100 rounded-2xl mb-2 text-cyan-600">
+                  <GalleryHorizontalEnd className="w-8 h-8" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Flashcards</h2>
              </div>
-             <FlashcardMode items={vocabList} />
+             <FlashcardMode items={vocabList} onUpdateConfidence={handleUpdateConfidence} />
           </div>
         )}
 
         {activeTab === 'repo' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <div className="mb-8 text-center md:text-left">
-                <h2 className="text-3xl font-bold text-slate-800 tracking-tight mb-2">Kho từ vựng</h2>
-                <p className="text-slate-500 text-sm">Quản lý toàn bộ {vocabList.length} từ vựng của bạn.</p>
+             <div className="mb-6 text-center md:text-left flex items-center gap-3">
+                 <div className="p-2 bg-slate-100 rounded-xl">
+                    <LayoutGrid className="w-6 h-6 text-slate-600" />
+                 </div>
+                 <div>
+                    <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Kho từ vựng</h2>
+                    <p className="text-slate-500 text-xs font-medium">{vocabList.length} từ đã lưu</p>
+                 </div>
              </div>
              <VocabRepository 
                 items={vocabList} 
@@ -364,6 +361,38 @@ const App: React.FC = () => {
         </div>
 
       </main>
+
+      {/* Floating Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-6 left-4 right-4 bg-white/95 backdrop-blur-xl border border-blue-100 rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] z-50 px-6 py-3 flex justify-between items-center h-[72px]">
+         
+         {/* Repo Tab */}
+         <button 
+           onClick={() => setActiveTab('repo')}
+           className={`flex flex-col items-center gap-1 transition-all active:scale-95 w-16 ${activeTab === 'repo' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+         >
+            <LayoutGrid className={`w-6 h-6 ${activeTab === 'repo' ? 'fill-blue-100' : ''}`} strokeWidth={activeTab === 'repo' ? 2.5 : 2} />
+         </button>
+
+         {/* Big Add Button (Learn) */}
+         <div className="relative -top-8">
+             <button 
+                onClick={() => setActiveTab('learn')}
+                className={`w-16 h-16 rounded-[1.2rem] flex items-center justify-center shadow-xl shadow-blue-500/40 border-[6px] border-slate-50 transition-all active:scale-90 ${activeTab === 'learn' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-white'}`}
+             >
+                <Plus className="w-8 h-8" strokeWidth={3} />
+             </button>
+         </div>
+
+         {/* Flashcard Tab */}
+         <button 
+           onClick={() => setActiveTab('flashcard')}
+           className={`flex flex-col items-center gap-1 transition-all active:scale-95 w-16 ${activeTab === 'flashcard' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+         >
+            <GalleryHorizontalEnd className={`w-6 h-6 ${activeTab === 'flashcard' ? 'fill-blue-100' : ''}`} strokeWidth={activeTab === 'flashcard' ? 2.5 : 2} />
+         </button>
+
+      </div>
+
     </div>
   );
 };
