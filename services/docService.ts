@@ -9,23 +9,28 @@ export const generateDoc = async (vocabList: VocabItem[], title: string = "Danh 
       children: [
         new TableCell({
           width: { size: 20, type: WidthType.PERCENTAGE },
-          shading: { fill: "E0E7FF" },
-          children: [new Paragraph({ children: [new TextRun({ text: "Từ vựng", bold: true })] })],
+          shading: { fill: "4F46E5" }, // Indigo header
+          children: [new Paragraph({ children: [new TextRun({ text: "Từ vựng (IPA)", bold: true, color: "FFFFFF" })] })],
         }),
         new TableCell({
-          width: { size: 15, type: WidthType.PERCENTAGE },
-          shading: { fill: "E0E7FF" },
-          children: [new Paragraph({ children: [new TextRun({ text: "Loại từ", bold: true })] })],
+          width: { size: 10, type: WidthType.PERCENTAGE },
+          shading: { fill: "4F46E5" },
+          children: [new Paragraph({ children: [new TextRun({ text: "Loại", bold: true, color: "FFFFFF" })] })],
         }),
         new TableCell({
-          width: { size: 30, type: WidthType.PERCENTAGE },
-          shading: { fill: "E0E7FF" },
-          children: [new Paragraph({ children: [new TextRun({ text: "Nghĩa", bold: true })] })],
+          width: { size: 10, type: WidthType.PERCENTAGE },
+          shading: { fill: "4F46E5" },
+          children: [new Paragraph({ children: [new TextRun({ text: "Level", bold: true, color: "FFFFFF" })] })],
+        }),
+        new TableCell({
+          width: { size: 25, type: WidthType.PERCENTAGE },
+          shading: { fill: "4F46E5" },
+          children: [new Paragraph({ children: [new TextRun({ text: "Nghĩa (VN)", bold: true, color: "FFFFFF" })] })],
         }),
         new TableCell({
           width: { size: 35, type: WidthType.PERCENTAGE },
-          shading: { fill: "E0E7FF" },
-          children: [new Paragraph({ children: [new TextRun({ text: "Ví dụ", bold: true })] })],
+          shading: { fill: "4F46E5" },
+          children: [new Paragraph({ children: [new TextRun({ text: "Ví dụ", bold: true, color: "FFFFFF" })] })],
         }),
       ],
     }),
@@ -33,10 +38,20 @@ export const generateDoc = async (vocabList: VocabItem[], title: string = "Danh 
       return new TableRow({
         children: [
           new TableCell({
-            children: [new Paragraph({ text: item.word })],
+            children: [
+              new Paragraph({ 
+                children: [
+                  new TextRun({ text: item.word, bold: true }),
+                  new TextRun({ text: `\n${item.phonetic}`, italics: true, size: 20, color: "666666" })
+                ] 
+              })
+            ],
           }),
           new TableCell({
             children: [new Paragraph({ text: item.partOfSpeech })],
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: item.level || "?" })],
           }),
           new TableCell({
             children: [new Paragraph({ text: item.meaning })],
@@ -64,12 +79,12 @@ export const generateDoc = async (vocabList: VocabItem[], title: string = "Danh 
             rows: tableRows,
             width: { size: 100, type: WidthType.PERCENTAGE },
             borders: {
-              top: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
-              bottom: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
-              left: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
-              right: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
-              insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
-              insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
+              top: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+              bottom: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+              left: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+              right: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+              insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
             },
           }),
           new Paragraph({
@@ -84,7 +99,6 @@ export const generateDoc = async (vocabList: VocabItem[], title: string = "Danh 
   });
 
   const blob = await Packer.toBlob(doc);
-  // Handle file-saver import which might be a function or an object depending on the bundler/environment
   const saveAs = (FileSaver as any).saveAs || FileSaver;
   saveAs(blob, `Tu_vung_${new Date().toISOString().slice(0, 10)}.docx`);
 };
