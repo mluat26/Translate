@@ -19,12 +19,12 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     <div className="fixed inset-0 z-[100] flex items-end justify-center md:items-center p-0 md:p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-500 animate-in fade-in"
         onClick={onClose}
       ></div>
 
       {/* Activity View */}
-      <div className="relative bg-white w-full max-w-md rounded-t-[2rem] md:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300 md:zoom-in-95 pb-6 md:pb-0">
+      <div className="relative bg-white w-full max-w-md rounded-t-[2rem] md:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:zoom-in-95 pb-6 md:pb-0">
         
          {/* Handle Bar */}
         <div className="w-full flex justify-center pt-3 pb-1 md:hidden" onClick={onClose}>

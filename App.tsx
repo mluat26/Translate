@@ -195,12 +195,18 @@ const App: React.FC = () => {
     }
   };
 
+  // Layout classes
+  // Note: We use 'fixed' positioning for Flashcard to prevent body scroll, but allow footer to overlap or sit on bottom.
+  const mainContainerClasses = activeTab === 'flashcard' 
+    ? "fixed inset-0 overflow-hidden flex flex-col bg-slate-50" 
+    : "min-h-screen bg-slate-50 text-slate-900 pb-32 md:pb-0 font-sans";
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900 font-sans pb-32 md:pb-0">
+    <div className={mainContainerClasses}>
       
       {/* Notifications Toast */}
       {notification && (
-          <div className="fixed top-24 right-4 z-[60] animate-in slide-in-from-right fade-in duration-300">
+          <div className="fixed top-24 right-4 z-[60] animate-in slide-in-from-right fade-in duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]">
               <div className="bg-slate-800 text-white px-5 py-4 rounded-2xl shadow-xl flex items-center gap-3 text-sm font-medium">
                   <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
                   {notification}
@@ -239,7 +245,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Minimal Header */}
-      <header className="sticky top-0 z-40 pt-4 px-4 sm:px-6 lg:px-8 mb-4 pointer-events-none">
+      <header className="flex-shrink-0 sticky top-0 z-40 pt-4 px-4 sm:px-6 lg:px-8 mb-2 pointer-events-none">
         <div className="max-w-7xl mx-auto flex items-start justify-between pointer-events-auto">
           
           {/* Stats Bar */}
@@ -267,11 +273,11 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      {/* Main Content Area */}
+      <main className={`relative z-10 flex-1 flex flex-col max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 ${activeTab === 'flashcard' ? 'overflow-hidden h-full pb-24' : ''}`}>
         
         {/* Desktop Navigation (Hidden on Mobile) */}
-        <div className="hidden md:flex justify-center mb-10 px-2">
+        <div className="hidden md:flex justify-center mb-6 px-2 flex-shrink-0">
           <div className="bg-white p-2 rounded-full grid grid-cols-3 relative border border-slate-100 shadow-xl shadow-slate-200/50 w-full max-w-lg">
             <div 
               className={`absolute top-2 bottom-2 rounded-full bg-blue-600 shadow-lg shadow-blue-500/30 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)]`}
@@ -298,9 +304,9 @@ const App: React.FC = () => {
         </div>
 
         {/* Tab Content */}
-        <div className="min-h-[500px]">
+        <div className={`flex-1 flex flex-col ${activeTab === 'flashcard' ? 'h-full' : ''}`}>
         {activeTab === 'learn' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6 pb-24">
             <div className="text-center space-y-1 mb-6">
               <div className="inline-flex items-center justify-center p-3 bg-blue-100 rounded-2xl mb-2 text-blue-600">
                 <BookOpen className="w-8 h-8" />
@@ -329,19 +335,13 @@ const App: React.FC = () => {
         )}
 
         {activeTab === 'flashcard' && (
-          <div className="animate-in zoom-in-95 duration-500 max-w-5xl mx-auto pt-4">
-             <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center p-3 bg-cyan-100 rounded-2xl mb-2 text-cyan-600">
-                  <GalleryHorizontalEnd className="w-8 h-8" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Flashcards</h2>
-             </div>
+          <div className="animate-in zoom-in-95 duration-500 w-full h-full flex flex-col">
              <FlashcardMode items={vocabList} onUpdateConfidence={handleUpdateConfidence} />
           </div>
         )}
 
         {activeTab === 'repo' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
              <div className="mb-6 text-center md:text-left flex items-center gap-3">
                  <div className="p-2 bg-slate-100 rounded-xl">
                     <LayoutGrid className="w-6 h-6 text-slate-600" />
@@ -362,34 +362,34 @@ const App: React.FC = () => {
 
       </main>
 
-      {/* Floating Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-6 left-4 right-4 bg-white/95 backdrop-blur-xl border border-blue-100 rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] z-50 px-6 py-3 flex justify-between items-center h-[72px]">
-         
-         {/* Repo Tab */}
-         <button 
-           onClick={() => setActiveTab('repo')}
-           className={`flex flex-col items-center gap-1 transition-all active:scale-95 w-16 ${activeTab === 'repo' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-         >
+      {/* Floating Mobile Bottom Navigation - VISIBLE ON ALL TABS */}
+      <div className="md:hidden fixed bottom-6 left-4 right-4 bg-white/95 backdrop-blur-xl border border-blue-100 rounded-[2rem] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] z-50 px-6 py-3 flex justify-between items-center h-[72px] animate-in slide-in-from-bottom-20 duration-500">
+        
+        {/* Repo Tab */}
+        <button 
+        onClick={() => setActiveTab('repo')}
+        className={`flex flex-col items-center gap-1 transition-all active:scale-95 w-16 ${activeTab === 'repo' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+        >
             <LayoutGrid className={`w-6 h-6 ${activeTab === 'repo' ? 'fill-blue-100' : ''}`} strokeWidth={activeTab === 'repo' ? 2.5 : 2} />
-         </button>
+        </button>
 
-         {/* Big Add Button (Learn) */}
-         <div className="relative -top-8">
-             <button 
+        {/* Big Add Button (Learn) */}
+        <div className="relative -top-8">
+            <button 
                 onClick={() => setActiveTab('learn')}
                 className={`w-16 h-16 rounded-[1.2rem] flex items-center justify-center shadow-xl shadow-blue-500/40 border-[6px] border-slate-50 transition-all active:scale-90 ${activeTab === 'learn' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-white'}`}
-             >
+            >
                 <Plus className="w-8 h-8" strokeWidth={3} />
-             </button>
-         </div>
+            </button>
+        </div>
 
-         {/* Flashcard Tab */}
-         <button 
-           onClick={() => setActiveTab('flashcard')}
-           className={`flex flex-col items-center gap-1 transition-all active:scale-95 w-16 ${activeTab === 'flashcard' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-         >
+        {/* Flashcard Tab */}
+        <button 
+        onClick={() => setActiveTab('flashcard')}
+        className={`flex flex-col items-center gap-1 transition-all active:scale-95 w-16 ${activeTab === 'flashcard' ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+        >
             <GalleryHorizontalEnd className={`w-6 h-6 ${activeTab === 'flashcard' ? 'fill-blue-100' : ''}`} strokeWidth={activeTab === 'flashcard' ? 2.5 : 2} />
-         </button>
+        </button>
 
       </div>
 

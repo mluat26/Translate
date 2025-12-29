@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Filter, Download, Inbox, SortAsc, LayoutGrid, Table as TableIcon, Trash2, X, Eye, EyeOff } from 'lucide-react';
+import { Search, Filter, Download, Inbox, SortAsc, LayoutGrid, Table as TableIcon, Trash2, X, Eye, EyeOff, SlidersHorizontal, Check, ArrowDownUp } from 'lucide-react';
 import VocabList from './VocabList';
 import { VocabItem } from '../types';
 
@@ -18,6 +18,9 @@ const VocabRepository: React.FC<VocabRepositoryProps> = ({ items, onDelete, onEx
   const [sortMode, setSortMode] = useState<SortMode>('newest');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [showMeaning, setShowMeaning] = useState(true);
+  
+  // Filter Sheet State
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
 
   const filteredItems = items.filter(item => {
     const matchesSearch = 
@@ -48,6 +51,8 @@ const VocabRepository: React.FC<VocabRepositoryProps> = ({ items, onDelete, onEx
     setSearchTerm('');
     setLevelFilter('ALL');
   }
+
+  const activeFiltersCount = (levelFilter !== 'ALL' ? 1 : 0);
 
   return (
     <div className="relative min-h-screen pb-80"> 
@@ -135,7 +140,7 @@ const VocabRepository: React.FC<VocabRepositoryProps> = ({ items, onDelete, onEx
       </div>
 
       {/* 2. TOOLBAR - Fixed at Bottom (Above Global Nav) - CLEANER UI */}
-      <div className="fixed bottom-[6.5rem] md:bottom-6 left-4 right-4 z-30 animate-in slide-in-from-bottom-10 duration-300 pointer-events-none">
+      <div className="fixed bottom-[6.5rem] md:bottom-6 left-4 right-4 z-30 animate-in slide-in-from-bottom-10 duration-500 pointer-events-none">
         
         {/* Unified Container */}
         <div className="bg-slate-100/90 backdrop-blur-xl rounded-[2rem] p-3 shadow-2xl shadow-slate-200/50 border border-white/50 max-w-4xl mx-auto pointer-events-auto flex flex-col md:flex-row gap-3 items-center">
@@ -152,7 +157,7 @@ const VocabRepository: React.FC<VocabRepositoryProps> = ({ items, onDelete, onEx
                 />
             </div>
 
-            {/* Controls Group - Scrollable on very small screens, flex row usually */}
+            {/* Controls Group */}
             <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto scrollbar-hide justify-between md:justify-end pb-1 md:pb-0">
                 
                 {/* Visibility Toggle */}
@@ -166,40 +171,19 @@ const VocabRepository: React.FC<VocabRepositoryProps> = ({ items, onDelete, onEx
 
                 <div className="h-6 w-px bg-slate-300/50 mx-1 flex-shrink-0"></div>
 
-                {/* View Toggle */}
-                <div className="flex bg-white p-1 rounded-xl border border-slate-200 flex-shrink-0 items-center">
-                    <button 
-                        onClick={() => setViewMode('grid')}
-                        className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${viewMode === 'grid' ? 'bg-slate-100 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                        title="Dạng lưới"
-                    >
-                        <LayoutGrid className="w-4 h-4" />
-                    </button>
-                    <button 
-                        onClick={() => setViewMode('table')}
-                        className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${viewMode === 'table' ? 'bg-slate-100 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                        title="Dạng bảng"
-                    >
-                        <TableIcon className="w-4 h-4" />
-                    </button>
-                </div>
-
-                {/* Filters */}
-                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 flex-shrink-0">
-                    {levels.map(lvl => (
-                        <button
-                            key={lvl}
-                            onClick={() => setLevelFilter(lvl)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap ${
-                                levelFilter === lvl 
-                                ? 'bg-blue-50 text-blue-600' 
-                                : 'text-slate-400 hover:bg-slate-50'
-                            }`}
-                        >
-                            {lvl === 'ALL' ? 'All' : lvl}
-                        </button>
-                    ))}
-                </div>
+                {/* Filter & Options Trigger (New Activity View Trigger) */}
+                <button
+                    onClick={() => setShowFilterSheet(true)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all flex-shrink-0 text-sm font-bold ${
+                        activeFiltersCount > 0 
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200' 
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                >
+                    <SlidersHorizontal className="w-4 h-4" />
+                    <span className="hidden sm:inline">Hiển thị & Lọc</span>
+                    {activeFiltersCount > 0 && <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-blue-600 text-[10px] ml-1">{activeFiltersCount}</span>}
+                </button>
 
                  <button
                     onClick={onExport}
@@ -207,12 +191,129 @@ const VocabRepository: React.FC<VocabRepositoryProps> = ({ items, onDelete, onEx
                     className="p-2.5 bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                     title="Xuất file Word"
                 >
-                    <Download className="w-4 h-4" />
+                    {/* Use text on mobile if space allows, or just icon */}
+                    <span className="hidden sm:inline text-xs font-bold mr-2">Xuất Word</span>
+                    {/* Icon only on small screens implicitly by structure */}
+                    <Download className="w-4 h-4 inline" />
                 </button>
 
             </div>
         </div>
       </div>
+
+      {/* 3. FILTER & OPTIONS SHEET (Activity View) */}
+      {showFilterSheet && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center md:items-center p-0 md:p-4">
+            {/* Backdrop */}
+            <div 
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-500"
+                onClick={() => setShowFilterSheet(false)}
+            ></div>
+            
+            {/* Sheet */}
+            <div className="relative bg-white w-full max-w-sm rounded-t-[2rem] md:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:zoom-in-95 pb-8 md:pb-0">
+                
+                {/* Handle */}
+                <div className="w-full flex justify-center pt-3 pb-1 md:hidden" onClick={() => setShowFilterSheet(false)}>
+                    <div className="w-12 h-1.5 bg-slate-200 rounded-full"></div>
+                </div>
+
+                <div className="p-6 pt-2 md:pt-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                             <SlidersHorizontal className="w-5 h-5 text-blue-600" />
+                             Tùy chọn hiển thị
+                        </h3>
+                        <button onClick={() => setShowFilterSheet(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:text-slate-800">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    <div className="space-y-6">
+                        
+                        {/* View Mode */}
+                        <div>
+                            <label className="text-xs font-bold text-slate-400 uppercase mb-3 block flex items-center gap-2">
+                                <LayoutGrid className="w-3.5 h-3.5" /> Giao diện
+                            </label>
+                            <div className="bg-slate-100 p-1 rounded-xl flex">
+                                <button 
+                                    onClick={() => setViewMode('grid')}
+                                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === 'grid' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    <LayoutGrid className="w-4 h-4" /> Lưới
+                                </button>
+                                <button 
+                                    onClick={() => setViewMode('table')}
+                                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === 'table' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    <TableIcon className="w-4 h-4" /> Bảng
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Sort */}
+                        <div>
+                             <label className="text-xs font-bold text-slate-400 uppercase mb-3 block flex items-center gap-2">
+                                <ArrowDownUp className="w-3.5 h-3.5" /> Sắp xếp
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {[
+                                    { id: 'newest', label: 'Mới nhất' },
+                                    { id: 'oldest', label: 'Cũ nhất' },
+                                    { id: 'az', label: 'A - Z' },
+                                    { id: 'za', label: 'Z - A' },
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => setSortMode(opt.id as SortMode)}
+                                        className={`py-2.5 px-3 rounded-xl text-sm font-bold border transition-all text-left flex justify-between items-center ${
+                                            sortMode === opt.id 
+                                            ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                        {sortMode === opt.id && <Check className="w-4 h-4" />}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Filter Level */}
+                         <div>
+                             <label className="text-xs font-bold text-slate-400 uppercase mb-3 block flex items-center gap-2">
+                                <Filter className="w-3.5 h-3.5" /> Lọc theo Level
+                            </label>
+                            <div className="flex gap-2">
+                                {levels.map(lvl => (
+                                    <button
+                                        key={lvl}
+                                        onClick={() => setLevelFilter(lvl)}
+                                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${
+                                            levelFilter === lvl 
+                                            ? 'bg-slate-900 text-white border-slate-900 shadow-md' 
+                                            : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        {lvl === 'ALL' ? 'Tất cả' : lvl}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={() => setShowFilterSheet(false)}
+                            className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all"
+                        >
+                            Xong
+                        </button>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
 
     </div>
   );
